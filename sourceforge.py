@@ -23,7 +23,10 @@ try:
 	from treelib import Node, Tree
 except:
 	sys.exit(make_colors("Install treelib first !", 'lw', 'lr', ['blink']))
-	
+if sys.version_info.major == 3:
+	from urllib.parse import unquote
+else:
+	from urllib import unquote
 from operator import itemgetter
 
 if sys.version_info.major == 3:
@@ -671,7 +674,7 @@ class sourceforge(object):
 	
 	def usage(self):
 		parser = argparse.ArgumentParser(formatter_class = argparse.RawTextHelpFormatter)
-		parser.add_argument('QUERY', help = 'Search for', action = 'store')
+		parser.add_argument('QUERY', help = unquote("Search for or project url file, example: https://sourceforge.net/projects/taskswitchxp/files/TaskSwitchXP%20Pro%202.x/2.0.11/TaskSwitchXP_2.0.11.exe/download"), action = 'store')
 		parser.add_argument('-p', '--download-path', help = 'Save download to', action = 'store')
 		parser.add_argument('-o', '--saveas', help = 'Save download file as other name', action = 'store')
 		parser.add_argument('-l', '--level', help = 'Level of trees file viewer', action = 'store', type = int, default = 1)
@@ -679,7 +682,10 @@ class sourceforge(object):
 			parser.print_help()
 		else:
 			args = parser.parse_args()
-			self.navigator(args.QUERY, args.download_path, args.saveas, level = args.level)
+			if 'https://' in args.URL:
+				self.download(args.QUERY, args.download_path, args.saveas)
+			else:
+				self.navigator(args.QUERY, args.download_path, args.saveas, level = args.level)
 		
 if __name__ == '__main__':
 	c = sourceforge()
