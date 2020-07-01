@@ -18,6 +18,7 @@ from pause import pause
 import time
 import cmdw
 import clipboard
+import progressbar
 try:
 	import treelib
 	from treelib import Node, Tree
@@ -48,13 +49,31 @@ class sourceforge(object):
 		self.session.headers.update(self.headers)		
 		self.url = "https://sourceforge.net/"
 		self.level = 100000
+		self.bar_prefix = "{variables.task} >> {variables.subask}"
+		self.bar_variables = {'task':'--', 'subtask':'--'}
+		self.bar_max_value = 10
+		self.bar = progressbar.ProgressBar(self.bar_max_value, prefix = self.bar_prefix, variables = self.bar_variables)
 		
 	def del_evenReadonly(self, action, name, exc):
-		import stat
-		os.chmod(name, stat.S_IWRITE)
-		os.remove(name)
+		task = make_colors('DIFFC REMOVE', 'lw', 'lr')
+		subtask = make_colors(str(name), 'b', 'ly')
+		self.bar.update(1, task = task, subtask = subtask, max_value=10)
+		n = 1
+		while 1:
+			try:
+				import stat
+				os.chmod(name, stat.S_IWRITE)
+				os.remove(name)
+				self.bar.update(10, task = task, subtask = subtask, max_value=10)
+				break
+			except:
+				if n == 10:
+					break
+				else:
+					self.bar.update(n, task = task, subtask = subtask, max_value=10)
+					n+=1
 		
-	def download(self, url, download_path=os.getcwd(), saveas=None):
+	def download(self, url, download_path=os.getcwd(), saveas=None, debugx = False, max_try=10):
 		headers = {
 			'user-agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:76.0) Gecko/20100101 Firefox/76.0',
 			'accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -64,32 +83,32 @@ class sourceforge(object):
 			'accept-encoding':'gzip, deflate'
 		}
 		
-		debug(headers = headers)
+		debug(headers = headers, debug = debugx)
 		self.session.headers.update(headers)
 		try:
 			a = self.session.get(url, headers = headers)
 		except:
 			a = self.session.get(url, headers = headers, verify=False)
-		debug(sess_headers = a.headers)
+		debug(sess_headers = a.headers, debug = debugx)
 		
 		content = a.content
 		
 		b = bs(content, 'lxml')
 		meta = b.find_all('meta', {'http-equiv':re.compile('refresh')})
-		debug(meta = meta)
+		debug(meta = meta, debug = debugx)
 		if meta:
 			meta_content = meta[0].get('content')
 			debug(meta_content = meta_content)
 			link = re.findall('url=(.*?)$', meta_content)[0]
-			debug(link = link)
-			debug(headers = headers)
+			debug(link = link, debug = debugx)
+			debug(headers = headers, debug = debugx)
 			headers.update({'referer': url})
-			debug(headers = headers)
+			debug(headers = headers, debug = debugx)
 			self.session.headers.update(headers)
 			project_name = re.findall('projects/(.*?)/', url)
-			debug(project_name = project_name)
+			debug(project_name = project_name, debug = debugx)
 			path = re.findall('files/(.*?)/download', url)
-			debug(path = path)
+			debug(path = path, debug = debugx)
 			cookies = {}
 			if not saveas:
 				try:
@@ -98,17 +117,17 @@ class sourceforge(object):
 					pass
 			if not saveas:
 				saveas = re.split("/", link)[-1]
-				debug(saveas = saveas)
+				debug(saveas = saveas, debug = debugx)
 				saveas = re.findall('(.*?)\?r=', saveas)
-				debug(saveas = saveas)
+				debug(saveas = saveas, debug = debugx)
 				if saveas:
 					saveas = saveas[0]
 
 			if project_name and path:
 				cookies = {'sf_mirror_attempt':project_name[0] + ":master:" + path[0]}
-				debug(cookies = cookies)
+				debug(cookies = cookies, debug = debugx)
 				headers.update({'Cookie':'sf_mirror_attempt=' + project_name[0] + ":master:" + path[0]})
-				debug(headers = headers)
+				debug(headers = headers, debug = debugx)
 				self.session.headers.update(headers)
 			
 			try:
@@ -122,8 +141,17 @@ class sourceforge(object):
 	
 	def download_latest(self, url, download_path=os.getcwd(), saveas=None):
 		if 'projects' in re.split("/", url):
-			url = re.split(self.url, url)[1]
+			url = re.split(self.url, url)
+			debug(url = url)
+			if len(url) > 1:
+				url = url[1]
+			else:
+				url = url[0]
 			debug(url0 = url)
+			if len(re.split("/", url)) == 5 and 'sourceforge.net' in url:
+				url = url + "/files/latest/download"
+				debug(url = url)
+				return self.download(url, download_path, saveas)
 			if "/" == url[0]:
 				url = "/".join(re.split("/", url[1:])[:2])
 				debug(url1 = url)
@@ -131,7 +159,8 @@ class sourceforge(object):
 				url = "/".join(re.split("/", url)[:2])
 				debug(url2 = url)
 			url = self.url + url + "/files/latest/download"
-			debug(url = url)
+			debug(url = url, debug = True)
+			
 			return self.download(url, download_path, saveas)
 		else:
 			print(make_colors("download latest failed !", 'lw', 'lr', ['blink']))
@@ -169,7 +198,14 @@ class sourceforge(object):
 				try:
 					data_tree.create_node(make_colors(i.get('title'), 'ly') + " " + make_colors("[" + str(nb) + "]", 'lw', 'lr'), i.get('title'), parent = root, data = i)
 				except treelib.tree.DuplicatedNodeIdError:
-					data_tree.create_node(make_colors(i.get('title'), 'ly') + " " + make_colors("[" + str(nb) + "]", 'lw', 'lr'), i.get('title') + "-" + str(n_same_folders), parent = root, data = i)
+					try:
+						data_tree.create_node(make_colors(i.get('title'), 'ly') + " " + make_colors("[" + str(nb) + "]", 'lw', 'lr'), i.get('title') + "-" + str(n_same_folders), parent = root, data = i)
+						n_same_folders += 1
+					except treelib.tree.DuplicatedNodeIdError:
+						debug(data_tree = data_tree, debug = True)
+						data_tree.show()
+						traceback.format_exc()
+						sys.exit(treelib.tree.DuplicatedNodeIdError)
 				if i.get('title'):
 					data_bank_name_dict.update({nb: i.get('title'),})
 					nb += 1									
@@ -288,7 +324,12 @@ class sourceforge(object):
 		if not url and not bs_object:
 			return {}
 		if not bs_object:
-			a = requests.get(url)
+			while 1:
+				try:
+					a = requests.get(url)
+					break
+				except:
+					time.sleep(1)
 			content = a.content
 			with open('result.html', 'wb') as f:
 				f.write(content)
@@ -347,6 +388,7 @@ class sourceforge(object):
 		debug(search_url = search_url)
 		params = {'q':query}
 		debug(params = params)
+		
 		try:
 			suggest_content = requests.get(suggest_url, params = params).json()
 		except:
@@ -553,7 +595,9 @@ class sourceforge(object):
 				return self.navigator(query, download_path, saveas, print_list, None, data, data_files_tree)
 		elif p == 'x' or p == 'q':
 			sys.exit(make_colors("SYSTEM EXIT !", 'lw', 'lr', ['blink']))
-		elif p == 's' or p[-1] == 's':
+		elif p == 's' or re.findall('\\d+.*?s', p):
+			if "=" in p:
+				return self.navigator(None, download_path, saveas, print_list, p, data, data_files_tree)
 			if p == 's':
 				n_sel = raw_input(make_colors("select number to show screenshot: ", 'lw', 'bl'))
 			else:
@@ -664,7 +708,7 @@ class sourceforge(object):
 						#debug(data_dict_sub = data_dict_sub)						
 						
 				return self.navigator(query, download_path, saveas, print_list, None, data, data_files_tree)
-		elif p[0].lower() == 's' or p[:2].lower() == 's=':
+		elif p[0].lower() == 's' or 's=' in p.lower():
 			if p[0] == 's':
 				query = p[1:].lower()
 			elif p[:2].lower() == 's=':
@@ -682,8 +726,11 @@ class sourceforge(object):
 			parser.print_help()
 		else:
 			args = parser.parse_args()
-			if 'https://' in args.URL:
-				self.download(args.QUERY, args.download_path, args.saveas)
+			if 'https://' in args.QUERY or 'http://' in args.QUERY:
+				if len(re.split("/", args.QUERY)) == 5:
+					self.download_latest(args.QUERY, args.download_path, args.saveas)
+				else:
+					self.download(args.QUERY, args.download_path, args.saveas)
 			else:
 				self.navigator(args.QUERY, args.download_path, args.saveas, level = args.level)
 		
