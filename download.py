@@ -20,6 +20,7 @@ import cfscrape
 #from mimetypes import guess_extension
 import ast
 import mimelist
+import clipboard
 cf = cfscrape.create_scraper()
 
 def proxy(proxy):
@@ -49,6 +50,8 @@ def download(url, download_path = "downloads", saveas = None, proxies = {}, sess
     debug(saveas = saveas)
     debug(download_path = download_path)
     debug(proxies = proxies)
+    if not download_path:
+        download_path = "downloads"
     if not os.path.isdir(download_path):
         os.makedirs(download_path)
     if proxies:
@@ -213,3 +216,31 @@ def download_img(url, download_path = os.getcwd(), saveas = None, proxies = {}, 
         print(make_colors("No Length data !", 'lightwhite', 'lightred', ['blink']))
         
     return saveas
+
+def download_linux(self, url, download_path=os.getcwd(), saveas=None, downloader = 'aria2c'):
+    '''
+        downloader: aria2c, wget, uget, persepolis
+    '''
+    aria2c = os.popen3("aria2c")
+    wget = os.popen3("wget")
+    persepolis = os.popen3("persepolis --help")
+    
+    if downloader == 'aria2c' and not re.findall("not found\n", aria2c[2].readlines()[0]):
+        if saveas:
+            saveas = '-o "{0}"'.format(saveas)
+        os.system('aria2c -c -d "{0}" "{1}" {2} --file-allocation=none'.format(os.path.abspath(download_path), url, saveas))
+    elif downloader == 'wget' and not re.findall("not found\n", wget[2].readlines()[0]):
+        if saveas:
+            saveas = '-P {0} -o "{1}"'.format(os.download_path.abspath(download_path), saveas)
+        else:
+            saveas = '-P {0}'.format(os.download_path.abspath(download_path))
+        os.system('wget -c "{2}" {1}'.format(url, saveas))
+    elif downloader == 'persepolis'  and not re.findall("not found\n", persepolis[2].readlines()[0]):
+        os.system('persepolis --link "{0}"'.format(url))
+    else:
+        try:
+            from pywget import wget as d
+            d.download(url, download_path, saveas)
+        except:
+            print(make_colors("Can't Download this file !, no Downloader supported !", 'lw', 'lr', ['blink']))
+            clipboard.copy(url)          

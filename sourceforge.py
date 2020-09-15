@@ -2,12 +2,13 @@
 from __future__ import print_function
 import os, sys
 import traceback
-sys.excepthook = traceback.format_exc
 import requests
 from bs4 import BeautifulSoup as bs
 from pydebugger.debug import debug
 from make_colors import make_colors
-from idm import IDMan
+if sys.platform == 'win32':
+	sys.excepthook = traceback.format_exc
+	from idm import IDMan
 from pywget import wget
 import argparse
 import cmdw
@@ -717,6 +718,7 @@ class sourceforge(object):
 		return self.navigator(None, download_path, saveas, True)
 	
 	def usage(self):
+		debug("USAGE")
 		parser = argparse.ArgumentParser(formatter_class = argparse.RawTextHelpFormatter)
 		parser.add_argument('QUERY', help = unquote("Search for or project url file, example: https://sourceforge.net/projects/taskswitchxp/files/TaskSwitchXP%20Pro%202.x/2.0.11/TaskSwitchXP_2.0.11.exe/download"), action = 'store')
 		parser.add_argument('-p', '--download-path', help = 'Save download to', action = 'store')

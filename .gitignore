@@ -10,6 +10,7 @@
 *.hgtags
 *dist/
 *.egg-info/
+torrent_downloads/
 traceback.log
 result.html
 __pycache__/
