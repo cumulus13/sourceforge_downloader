@@ -1,4 +1,4 @@
-#!c:/SDK/Anaconda2/python.exe
+#!/usr/bin/env python2
 from __future__ import print_function
 import os, sys
 import traceback
@@ -26,9 +26,9 @@ try:
 except:
 	sys.exit(make_colors("Install treelib first !", 'lw', 'lr', ['blink']))
 if sys.version_info.major == 3:
-	from urllib.parse import unquote
+	from urllib.parse import unquote, quote
 else:
-	from urllib import unquote
+	from urllib import unquote, quote
 from operator import itemgetter
 
 if sys.version_info.major == 3:
@@ -74,7 +74,7 @@ class sourceforge(object):
 					self.bar.update(n, task = task, subtask = subtask, max_value=10)
 					n+=1
 		
-	def download(self, url, download_path=os.getcwd(), saveas=None, debugx = False, max_try=10):
+	def download(self, url, download_path=os.getcwd(), saveas=None, debugx = False, max_try=10, clip = False, downloadit = False):
 		headers = {
 			'user-agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:76.0) Gecko/20100101 Firefox/76.0',
 			'accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -112,10 +112,18 @@ class sourceforge(object):
 			debug(path = path, debug = debugx)
 			cookies = {}
 			if not saveas:
+				saveas_path = urlparse.urlparse(link).path
+				if saveas_path:
+					saveas = re.split("/", saveas_path)[-1]
+			debug(saveas = saveas, debug = True)
+			# if saveas:
+			# 	saveas = ''
+			if not saveas:
 				try:
 					saveas = os.path.split(path[0])[1]
 				except:
 					pass
+			debug(saveas = saveas, debug = True)
 			if not saveas:
 				saveas = re.split("/", link)[-1]
 				debug(saveas = saveas, debug = debugx)
@@ -123,24 +131,33 @@ class sourceforge(object):
 				debug(saveas = saveas, debug = debugx)
 				if saveas:
 					saveas = saveas[0]
-
+			debug(saveas = saveas, debug = True)
 			if project_name and path:
 				cookies = {'sf_mirror_attempt':project_name[0] + ":master:" + path[0]}
 				debug(cookies = cookies, debug = debugx)
 				headers.update({'Cookie':'sf_mirror_attempt=' + project_name[0] + ":master:" + path[0]})
 				debug(headers = headers, debug = debugx)
 				self.session.headers.update(headers)
-			
-			try:
-				from idm import IDMan
-				dm = IDMan()
-				return dm.download(link, download_path, saveas, cookie=str(cookies))
-			except:
-				traceback.format_exc()
-				import download
-				return download.download(link, download_path, saveas)
+			# pause()
+			if clip:
+				clipboard.copy(link)
+			if downloadit:
+				try:
+					if sys.platform == 'win32':
+						from idm import IDMan
+						dm = IDMan()
+						return dm.download(link, download_path, saveas, cookie=str(cookies))
+					else:
+						import download
+						return download.download(link, download_path, saveas)	
+				except:
+					traceback.format_exc()
+					qq = raw_input(make_colors("Do you want to continue [y/e[n]ter:", 'lw', 'r') + " ")
+					if qq == 'y' or qq == 'yes':
+						import download
+						return download.download(link, download_path, saveas)
 	
-	def download_latest(self, url, download_path=os.getcwd(), saveas=None):
+	def download_latest(self, url, download_path=os.getcwd(), saveas=None, clip = False, downloadit = False):
 		if 'projects' in re.split("/", url):
 			url = re.split(self.url, url)
 			debug(url = url)
@@ -160,9 +177,9 @@ class sourceforge(object):
 				url = "/".join(re.split("/", url)[:2])
 				debug(url2 = url)
 			url = self.url + url + "/files/latest/download"
-			debug(url = url, debug = True)
+			debug(url = url)
 			
-			return self.download(url, download_path, saveas)
+			return self.download(url, download_path, saveas, clip = clip, downloadit = downloadit)
 		else:
 			print(make_colors("download latest failed !", 'lw', 'lr', ['blink']))
 			return None
@@ -203,7 +220,7 @@ class sourceforge(object):
 						data_tree.create_node(make_colors(i.get('title'), 'ly') + " " + make_colors("[" + str(nb) + "]", 'lw', 'lr'), i.get('title') + "-" + str(n_same_folders), parent = root, data = i)
 						n_same_folders += 1
 					except treelib.tree.DuplicatedNodeIdError:
-						debug(data_tree = data_tree, debug = True)
+						debug(data_tree = data_tree)
 						data_tree.show()
 						traceback.format_exc()
 						sys.exit(treelib.tree.DuplicatedNodeIdError)
@@ -724,15 +741,20 @@ class sourceforge(object):
 		parser.add_argument('-p', '--download-path', help = 'Save download to', action = 'store')
 		parser.add_argument('-o', '--saveas', help = 'Save download file as other name', action = 'store')
 		parser.add_argument('-l', '--level', help = 'Level of trees file viewer', action = 'store', type = int, default = 1)
+		parser.add_argument('-c', '--copy-url', help = 'Copy download url generated', action = 'store_true')
+		parser.add_argument('-d', '--download', help = 'Download url generated', action = 'store_true')
 		if len(sys.argv) == 1:
 			parser.print_help()
 		else:
 			args = parser.parse_args()
+			if args.QUERY == 'c':
+				args.QUERY = clipboard.paste()
+				print(make_colors("QUERY:", 'lw', 'lr') + " " + make_colors(args.QUERY, 'b', 'ly'))
 			if 'https://' in args.QUERY or 'http://' in args.QUERY:
 				if len(re.split("/", args.QUERY)) == 5:
-					self.download_latest(args.QUERY, args.download_path, args.saveas)
+					self.download_latest(args.QUERY, args.download_path, args.saveas, clip = args.copy_url, downloadit = args.download)
 				else:
-					self.download(args.QUERY, args.download_path, args.saveas)
+					self.download(args.QUERY, args.download_path, args.saveas, clip = args.copy_url, downloadit = args.download)
 			else:
 				self.navigator(args.QUERY, args.download_path, args.saveas, level = args.level)
 		
